@@ -2,11 +2,16 @@ package com.example.customer_api.service;
 
 import com.example.customer_api.dto.CustomerRequestDTO;
 import com.example.customer_api.dto.CustomerResponseDTO;
+import com.example.customer_api.dto.CustomerUpdateDTO;
 import com.example.customer_api.entity.Customer;
 import com.example.customer_api.exception.DuplicateResourceException;
 import com.example.customer_api.exception.ResourceNotFoundException;
 import com.example.customer_api.repository.CustomerRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,73 +21,72 @@ import java.util.stream.Collectors;
 @Service
 @Transactional
 public class CustomerServiceImpl implements CustomerService {
-    
+
     private final CustomerRepository customerRepository;
-    
+
     @Autowired
     public CustomerServiceImpl(CustomerRepository customerRepository) {
         this.customerRepository = customerRepository;
     }
-    
+
     @Override
-    public List<CustomerResponseDTO> getAllCustomers() {
-        return customerRepository.findAll()
-                .stream()
-                .map(this::convertToResponseDTO)
-                .collect(Collectors.toList());
+    public Page<CustomerResponseDTO> getAllCustomers(int page, int size, Sort sort) {
+        Pageable pageable = PageRequest.of(page, size, sort);
+        Page<Customer> customers = customerRepository.findAll(pageable);
+        return customers.map(this::convertToResponseDTO);
     }
-    
+
     @Override
     public CustomerResponseDTO getCustomerById(Long id) {
         Customer customer = customerRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer not found with id: " + id));
         return convertToResponseDTO(customer);
     }
-    
+
     @Override
     public CustomerResponseDTO createCustomer(CustomerRequestDTO requestDTO) {
         // Check for duplicates
         if (customerRepository.existsByCustomerCode(requestDTO.getCustomerCode())) {
             throw new DuplicateResourceException("Customer code already exists: " + requestDTO.getCustomerCode());
         }
-        
+
         if (customerRepository.existsByEmail(requestDTO.getEmail())) {
             throw new DuplicateResourceException("Email already exists: " + requestDTO.getEmail());
         }
-        
+
         // Convert DTO to Entity
         Customer customer = convertToEntity(requestDTO);
-        
+
         // Save to database
         Customer savedCustomer = customerRepository.save(customer);
-        
+
         // Convert Entity to Response DTO
         return convertToResponseDTO(savedCustomer);
     }
-    
+
     @Override
     public CustomerResponseDTO updateCustomer(Long id, CustomerRequestDTO requestDTO) {
         Customer existingCustomer = customerRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer not found with id: " + id));
-        
+
         // Check if email is being changed to an existing one
-        if (!existingCustomer.getEmail().equals(requestDTO.getEmail()) 
-            && customerRepository.existsByEmail(requestDTO.getEmail())) {
+        if (!existingCustomer.getEmail().equals(requestDTO.getEmail())
+                && customerRepository.existsByEmail(requestDTO.getEmail())) {
             throw new DuplicateResourceException("Email already exists: " + requestDTO.getEmail());
         }
-        
+
         // Update fields
         existingCustomer.setFullName(requestDTO.getFullName());
         existingCustomer.setEmail(requestDTO.getEmail());
         existingCustomer.setPhone(requestDTO.getPhone());
         existingCustomer.setAddress(requestDTO.getAddress());
-        
+
         // Don't update customerCode (immutable)
-        
+
         Customer updatedCustomer = customerRepository.save(existingCustomer);
         return convertToResponseDTO(updatedCustomer);
     }
-    
+
     @Override
     public void deleteCustomer(Long id) {
         if (!customerRepository.existsById(id)) {
@@ -90,7 +94,7 @@ public class CustomerServiceImpl implements CustomerService {
         }
         customerRepository.deleteById(id);
     }
-    
+
     @Override
     public List<CustomerResponseDTO> searchCustomers(String keyword) {
         return customerRepository.searchCustomers(keyword)
@@ -98,7 +102,7 @@ public class CustomerServiceImpl implements CustomerService {
                 .map(this::convertToResponseDTO)
                 .collect(Collectors.toList());
     }
-    
+
     @Override
     public List<CustomerResponseDTO> getCustomersByStatus(String status) {
         return customerRepository.findByStatus(status)
@@ -106,9 +110,26 @@ public class CustomerServiceImpl implements CustomerService {
                 .map(this::convertToResponseDTO)
                 .collect(Collectors.toList());
     }
-    
+
+    @Override
+    public CustomerResponseDTO partialUpdateCustomer(Long id, CustomerUpdateDTO updateDTO) {
+        Customer customer = customerRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
+
+        // Only update non-null fields
+        if (updateDTO.getFullName() != null) {
+            customer.setFullName(updateDTO.getFullName());
+        }
+        if (updateDTO.getEmail() != null) {
+            customer.setEmail(updateDTO.getEmail());
+        }
+        // ... other fields
+
+        return convertToResponseDTO(customerRepository.save(customer));
+    }
+
     // Helper Methods for DTO Conversion
-    
+
     private CustomerResponseDTO convertToResponseDTO(Customer customer) {
         CustomerResponseDTO dto = new CustomerResponseDTO();
         dto.setId(customer.getId());
@@ -121,7 +142,7 @@ public class CustomerServiceImpl implements CustomerService {
         dto.setCreatedAt(customer.getCreatedAt());
         return dto;
     }
-    
+
     private Customer convertToEntity(CustomerRequestDTO dto) {
         Customer customer = new Customer();
         customer.setCustomerCode(dto.getCustomerCode());
