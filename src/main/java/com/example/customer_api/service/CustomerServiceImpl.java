@@ -1,12 +1,8 @@
 package com.example.customer_api.service;
 
-import com.example.customer_api.dto.CustomerRequestDTO;
-import com.example.customer_api.dto.CustomerResponseDTO;
-import com.example.customer_api.dto.CustomerUpdateDTO;
-import com.example.customer_api.entity.Customer;
-import com.example.customer_api.exception.DuplicateResourceException;
-import com.example.customer_api.exception.ResourceNotFoundException;
-import com.example.customer_api.repository.CustomerRepository;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -15,8 +11,13 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.stream.Collectors;
+import com.example.customer_api.dto.CustomerRequestDTO;
+import com.example.customer_api.dto.CustomerResponseDTO;
+import com.example.customer_api.dto.CustomerUpdateDTO;
+import com.example.customer_api.entity.Customer;
+import com.example.customer_api.exception.DuplicateResourceException;
+import com.example.customer_api.exception.ResourceNotFoundException;
+import com.example.customer_api.repository.CustomerRepository;
 
 @Service
 @Transactional
